@@ -356,13 +356,13 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
             <Autocomplete
               songs={songList}
               onSelect={handleSelect}
-              disabled={isPlaying || previewFetching}
+              disabled={previewFetching}
             />
 
             <div className="flex gap-3">
               <button
                 onClick={handleSubmit}
-                disabled={!selectedSong || isPlaying}
+                disabled={!selectedSong}
                 className="flex-1 py-3 bg-green-500 hover:bg-green-400 disabled:bg-gray-700 disabled:text-gray-500 text-black font-bold rounded-xl transition-colors"
               >
                 Submit
