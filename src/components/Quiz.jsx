@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { fetchPlaylistTracks } from '../utils/spotify.js'
-import { playClip, stopCurrentAudio, getRandomOffset, loadAudioBuffer } from '../utils/audio.js'
+import { fetchPreviewUrl } from '../utils/itunes.js'
+import { playClip, stopCurrentAudio, getRandomOffset, preloadAudio } from '../utils/audio.js'
 import Autocomplete from './Autocomplete.jsx'
 
 const CLIP_DURATIONS = [1, 3, 5, 30]
@@ -16,7 +17,6 @@ function shuffle(arr) {
 }
 
 export default function Quiz({ token, playlist, onFinish, onLogout }) {
-  const [tracks, setTracks] = useState([])
   const [songList, setSongList] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadingError, setLoadingError] = useState(null)
@@ -24,38 +24,36 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
   const [tierIndex, setTierIndex] = useState(0)
   const [results, setResults] = useState([])
   const [isPlaying, setIsPlaying] = useState(false)
-  const [guessState, setGuessState] = useState('idle') // idle | correct | wrong | revealed
+  const [guessState, setGuessState] = useState('idle')
   const [selectedSong, setSelectedSong] = useState(null)
   const [submitted, setSubmitted] = useState(false)
-  const [feedback, setFeedback] = useState(null) // 'correct' | 'wrong'
-  const [preloading, setPreloading] = useState(false)
-  const offsetRef = useRef({})
+  const [feedback, setFeedback] = useState(null)
+  // iTunes preview URL state for current song
+  const [currentPreviewUrl, setCurrentPreviewUrl] = useState(null)
+  const [previewFetching, setPreviewFetching] = useState(false)
+  const [noPreview, setNoPreview] = useState(false)
 
+  const offsetRef = useRef({})
+  const previewCacheRef = useRef({}) // songId -> url | null
+
+  // Load tracks from Spotify on mount
   useEffect(() => {
     fetchPlaylistTracks(token, playlist.id)
-      .then(({ tracks: previewTracks, total }) => {
-        if (previewTracks.length === 0) {
-          const msg = total === 0
-            ? 'This playlist is empty.'
-            : `None of the ${total} songs in this playlist have audio previews. Spotify has removed preview clips for most tracks — try a different playlist or check back later.`
-          setLoadingError(msg)
+      .then((tracks) => {
+        if (tracks.length === 0) {
+          setLoadingError('This playlist is empty.')
           return
         }
-        const shuffled = shuffle(previewTracks)
-        setTracks(shuffled)
-        const list = shuffled.map((track) => ({
-          id: track.id,
-          title: track.name,
-          artist: track.artists.map((a) => a.name).join(', '),
-          albumArt: track.album.images?.[1]?.url || track.album.images?.[0]?.url,
-          previewUrl: track.preview_url,
+        const shuffled = shuffle(tracks)
+        const list = shuffled.map((t) => ({
+          id: t.id,
+          title: t.name,
+          artist: t.artists.map((a) => a.name).join(', '),
+          albumArt: t.album.images?.[1]?.url || t.album.images?.[0]?.url,
         }))
+        shuffled.forEach((t) => { offsetRef.current[t.id] = getRandomOffset() })
         setSongList(list)
-        // Pre-assign offsets
-        shuffled.forEach((t) => {
-          offsetRef.current[t.id] = getRandomOffset(t.preview_url)
-        })
-        setResults(shuffled.map(() => ({ tier: null, missed: false })))
+        setResults(list.map(() => ({ tier: null, missed: false })))
       })
       .catch((err) => {
         if (err.message === 'UNAUTHORIZED') onLogout()
@@ -64,38 +62,74 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
       .finally(() => setLoading(false))
   }, [token, playlist.id, onLogout])
 
-  // Preload next track
+  // When the current song changes, fetch its iTunes preview and auto-play
   useEffect(() => {
-    if (songList.length === 0) return
+    if (songList.length === 0 || loading) return
+    const song = songList[currentIndex]
+    if (!song) return
+
+    let stale = false
+
+    setTierIndex(0)
+    setSubmitted(false)
+    setSelectedSong(null)
+    setFeedback(null)
+    setGuessState('idle')
+    setCurrentPreviewUrl(null)
+    setNoPreview(false)
+    stopCurrentAudio()
+
+    const cached = previewCacheRef.current[song.id]
+    const alreadyKnown = cached !== undefined
+
+    if (!alreadyKnown) setPreviewFetching(true)
+
+    ;(async () => {
+      let url = alreadyKnown
+        ? cached
+        : await fetchPreviewUrl(song.title, song.artist)
+
+      if (!alreadyKnown) previewCacheRef.current[song.id] = url ?? null
+      if (stale) return
+
+      setPreviewFetching(false)
+
+      if (!url) {
+        setNoPreview(true)
+        return
+      }
+
+      setCurrentPreviewUrl(url)
+      setIsPlaying(true)
+      await playClip(url, offsetRef.current[song.id] ?? 0, CLIP_DURATIONS[0])
+      if (!stale) setIsPlaying(false)
+    })()
+
+    // Pre-fetch next song's preview in background
     const next = songList[currentIndex + 1]
-    if (next?.previewUrl) {
-      loadAudioBuffer(next.previewUrl).catch(() => {})
+    if (next && previewCacheRef.current[next.id] === undefined) {
+      fetchPreviewUrl(next.title, next.artist)
+        .then((u) => {
+          previewCacheRef.current[next.id] = u ?? null
+          if (u) preloadAudio(u)
+        })
+        .catch(() => { previewCacheRef.current[next.id] = null })
     }
-  }, [currentIndex, songList])
+
+    return () => {
+      stale = true
+      stopCurrentAudio()
+    }
+  }, [currentIndex, songList.length, loading])
 
   const currentSong = songList[currentIndex]
-  const currentTrack = tracks[currentIndex]
 
   async function playCurrentClip(tIdx = tierIndex) {
-    if (!currentSong?.previewUrl) return
+    if (!currentPreviewUrl) return
     setIsPlaying(true)
-    const duration = CLIP_DURATIONS[tIdx]
-    const offset = offsetRef.current[currentSong.id] ?? 0
-    await playClip(currentSong.previewUrl, offset, duration)
+    await playClip(currentPreviewUrl, offsetRef.current[currentSong.id] ?? 0, CLIP_DURATIONS[tIdx])
     setIsPlaying(false)
   }
-
-  useEffect(() => {
-    if (songList.length > 0 && !loading) {
-      setTierIndex(0)
-      setSubmitted(false)
-      setSelectedSong(null)
-      setFeedback(null)
-      setGuessState('idle')
-      playCurrentClip(0)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, songList.length, loading])
 
   function handleSelect(song) {
     setSelectedSong(song)
@@ -125,7 +159,6 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
   function handleExtend() {
     const nextTier = tierIndex + 1
     if (nextTier >= CLIP_DURATIONS.length) {
-      // Show answer — missed
       setGuessState('revealed')
       stopCurrentAudio()
       const newResults = [...results]
@@ -140,7 +173,6 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
   }
 
   function handleSkip() {
-    // After full preview, user gives up
     setGuessState('revealed')
     stopCurrentAudio()
     const newResults = [...results]
@@ -158,12 +190,20 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
   }
 
   function handleNextAfterReveal() {
-    const newResults = results[currentIndex].tier === null && results[currentIndex].missed
-      ? results
-      : results
     stopCurrentAudio()
     if (currentIndex + 1 >= songList.length) {
       onFinish({ songList, results, playlist })
+    } else {
+      setCurrentIndex((i) => i + 1)
+    }
+  }
+
+  function handleSkipNoPreview() {
+    const newResults = [...results]
+    newResults[currentIndex] = { tier: null, missed: true }
+    setResults(newResults)
+    if (currentIndex + 1 >= songList.length) {
+      onFinish({ songList, results: newResults, playlist })
     } else {
       setCurrentIndex((i) => i + 1)
     }
@@ -198,7 +238,7 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
-      {/* Header */}
+      {/* Header / progress */}
       <div className="px-4 pt-4 pb-2 flex items-center gap-3">
         {playlistImg && (
           <img src={playlistImg} alt={playlist.name} className="w-8 h-8 rounded object-cover" />
@@ -222,26 +262,22 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
       {/* Main area */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 gap-6">
 
-        {/* Album art — shown after guess */}
+        {/* Album art placeholder / revealed art */}
         <div className="relative w-48 h-48 rounded-2xl overflow-hidden bg-gray-800 flex items-center justify-center">
           {showAlbumArt && currentSong?.albumArt ? (
-            <img
-              src={currentSong.albumArt}
-              alt={currentSong.title}
-              className="w-full h-full object-cover"
-            />
+            <img src={currentSong.albumArt} alt={currentSong.title} className="w-full h-full object-cover" />
           ) : (
             <div className="flex flex-col items-center gap-2 text-gray-600">
               <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/>
               </svg>
               {isPlaying && (
-                <div className="flex gap-1">
-                  {[0, 1, 2, 3].map((i) => (
+                <div className="flex gap-1 items-end">
+                  {[12, 20, 16, 24].map((h, i) => (
                     <div
                       key={i}
-                      className="w-1 bg-green-500 rounded-full animate-bounce"
-                      style={{ height: `${12 + i * 4}px`, animationDelay: `${i * 0.1}s` }}
+                      className="w-1.5 bg-green-500 rounded-full animate-bounce"
+                      style={{ height: `${h}px`, animationDelay: `${i * 0.12}s` }}
                     />
                   ))}
                 </div>
@@ -266,13 +302,11 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
           </div>
         )}
 
-        {/* Feedback flash */}
+        {/* Feedback flash overlay */}
         {feedback && (
-          <div
-            className={`fixed inset-0 pointer-events-none flex items-center justify-center z-50 ${
-              feedback === 'correct' ? 'bg-green-500/20' : 'bg-red-500/20'
-            }`}
-          >
+          <div className={`fixed inset-0 pointer-events-none flex items-center justify-center z-50 ${
+            feedback === 'correct' ? 'bg-green-500/20' : 'bg-red-500/20'
+          }`}>
             <div className={`text-4xl font-black ${
               feedback === 'correct' ? 'text-green-400' : 'text-red-400'
             }`}>
@@ -281,20 +315,39 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
           </div>
         )}
 
-        {/* Controls */}
-        {guessState !== 'correct' && guessState !== 'revealed' && (
+        {/* iTunes preview loading */}
+        {previewFetching && guessState === 'idle' && (
+          <div className="flex items-center gap-3 text-gray-400 text-sm">
+            <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+            Finding audio preview…
+          </div>
+        )}
+
+        {/* No preview available for this song */}
+        {noPreview && (
+          <div className="w-full max-w-md bg-gray-900 rounded-2xl p-5 text-center space-y-3">
+            <p className="text-gray-300 font-medium">"{currentSong?.title}"</p>
+            <p className="text-gray-500 text-sm">{currentSong?.artist}</p>
+            <p className="text-yellow-500 text-sm">No audio preview found for this song.</p>
+            <button
+              onClick={handleSkipNoPreview}
+              className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded-xl transition-colors"
+            >
+              Skip →
+            </button>
+          </div>
+        )}
+
+        {/* Quiz controls */}
+        {!previewFetching && !noPreview && guessState !== 'correct' && guessState !== 'revealed' && (
           <div className="w-full max-w-md space-y-4">
-            {/* Tier indicator */}
+            {/* Tier progress dots */}
             <div className="flex items-center justify-center gap-2">
               {CLIP_DURATIONS.map((d, i) => (
                 <div
                   key={i}
                   className={`h-1.5 rounded-full transition-all ${
-                    i < tierIndex
-                      ? 'bg-red-500 w-8'
-                      : i === tierIndex
-                      ? 'bg-green-500 w-12'
-                      : 'bg-gray-700 w-8'
+                    i < tierIndex ? 'bg-red-500 w-8' : i === tierIndex ? 'bg-green-500 w-12' : 'bg-gray-700 w-8'
                   }`}
                 />
               ))}
@@ -303,7 +356,7 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
             <Autocomplete
               songs={songList}
               onSelect={handleSelect}
-              disabled={isPlaying || guessState === 'correct' || guessState === 'revealed'}
+              disabled={isPlaying || previewFetching}
             />
 
             <div className="flex gap-3">
@@ -336,8 +389,8 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
 
             <button
               onClick={() => playCurrentClip(tierIndex)}
-              disabled={isPlaying}
-              className="w-full py-2 text-sm text-gray-500 hover:text-gray-300 flex items-center justify-center gap-2 transition-colors"
+              disabled={isPlaying || !currentPreviewUrl}
+              className="w-full py-2 text-sm text-gray-500 hover:text-gray-300 flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7z"/>
@@ -347,17 +400,15 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
           </div>
         )}
 
-        {/* Next button after result */}
-        {(guessState === 'correct' || guessState === 'revealed') && (
+        {/* Next button after reveal */}
+        {(guessState === 'revealed') && (
           <div className="w-full max-w-md">
-            {guessState === 'revealed' && (
-              <button
-                onClick={handleNextAfterReveal}
-                className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-xl transition-colors"
-              >
-                {currentIndex + 1 >= songList.length ? 'See Results →' : 'Next Song →'}
-              </button>
-            )}
+            <button
+              onClick={handleNextAfterReveal}
+              className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-xl transition-colors"
+            >
+              {currentIndex + 1 >= songList.length ? 'See Results →' : 'Next Song →'}
+            </button>
           </div>
         )}
       </div>

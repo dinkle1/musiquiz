@@ -99,24 +99,20 @@ export async function fetchPlaylists(token) {
 }
 
 export async function fetchPlaylistTracks(token, playlistId) {
-  const allTracks = []
+  const tracks = []
   let url = `/playlists/${playlistId}/tracks?limit=100`
 
   while (url) {
     const data = await apiFetch(url, token)
     for (const item of data.items) {
       if (item?.track?.id) {
-        allTracks.push(item.track)
+        tracks.push(item.track)
       }
     }
     url = data.next ? data.next.replace(API_BASE, '') : null
   }
 
-  const withPreviews = allTracks.filter((t) => t.preview_url)
-
-  // Return tracks with previews if any exist, otherwise return all tracks
-  // so callers can show a meaningful count and error
-  return { tracks: withPreviews, total: allTracks.length }
+  return tracks
 }
 
 export async function fetchPlaylist(token, playlistId) {

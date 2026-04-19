@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { exchangeCodeForToken, getStoredToken, clearToken, fetchPlaylist } from './utils/spotify.js'
+import { exchangeCodeForToken, getStoredToken, clearToken } from './utils/spotify.js'
 import { stopCurrentAudio, clearAudioCache } from './utils/audio.js'
+import { clearPreviewCache } from './utils/itunes.js'
 import Login from './components/Login.jsx'
 import PlaylistPicker from './components/PlaylistPicker.jsx'
 import Quiz from './components/Quiz.jsx'
@@ -47,6 +48,7 @@ export default function App() {
   function handleLogout() {
     clearToken()
     clearAudioCache()
+    clearPreviewCache()
     stopCurrentAudio()
     setToken(null)
     setScreen('login')
@@ -72,11 +74,13 @@ export default function App() {
 
   function handleRestart() {
     clearAudioCache()
+    clearPreviewCache()
     setScreen('quiz')
   }
 
   function handlePickNew() {
     clearAudioCache()
+    clearPreviewCache()
     setSelectedPlaylist(null)
     setScreen('playlists')
   }
