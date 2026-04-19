@@ -33,12 +33,15 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
 
   useEffect(() => {
     fetchPlaylistTracks(token, playlist.id)
-      .then((t) => {
-        if (t.length === 0) {
-          setLoadingError('This playlist has no previewable songs. Try another playlist.')
+      .then(({ tracks: previewTracks, total }) => {
+        if (previewTracks.length === 0) {
+          const msg = total === 0
+            ? 'This playlist is empty.'
+            : `None of the ${total} songs in this playlist have audio previews. Spotify has removed preview clips for most tracks — try a different playlist or check back later.`
+          setLoadingError(msg)
           return
         }
-        const shuffled = shuffle(t)
+        const shuffled = shuffle(previewTracks)
         setTracks(shuffled)
         const list = shuffled.map((track) => ({
           id: track.id,
