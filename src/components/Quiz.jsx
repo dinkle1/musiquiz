@@ -135,7 +135,7 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
     setSelectedSong(song)
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!selectedSong || submitted) return
     setSubmitted(true)
 
@@ -143,11 +143,16 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
     if (correct) {
       setFeedback('correct')
       setGuessState('correct')
-      stopCurrentAudio()
       const newResults = [...results]
       newResults[currentIndex] = { tier: tierIndex, missed: false }
       setResults(newResults)
-      setTimeout(() => advanceToNext(newResults), 1500)
+      // Play a victory clip before moving on
+      if (currentPreviewUrl) {
+        setIsPlaying(true)
+        await playClip(currentPreviewUrl, offsetRef.current[currentSong.id] ?? 0, 5)
+        setIsPlaying(false)
+      }
+      advanceToNext(newResults)
     } else {
       setFeedback('wrong')
       setGuessState('wrong')
@@ -368,7 +373,7 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
                 Submit
               </button>
 
-              {!isLastTier ? (
+              {!isLastTier && (
                 <button
                   onClick={handleExtend}
                   disabled={isPlaying}
@@ -376,27 +381,28 @@ export default function Quiz({ token, playlist, onFinish, onLogout }) {
                 >
                   Play {CLIP_DURATIONS[tierIndex + 1] === 30 ? 'full' : `${CLIP_DURATIONS[tierIndex + 1]}s`}
                 </button>
-              ) : (
-                <button
-                  onClick={handleSkip}
-                  disabled={isPlaying}
-                  className="px-4 py-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-400 text-sm font-semibold rounded-xl transition-colors"
-                >
-                  Give up
-                </button>
               )}
             </div>
 
-            <button
-              onClick={() => playCurrentClip(tierIndex)}
-              disabled={isPlaying || !currentPreviewUrl}
-              className="w-full py-2 text-sm text-gray-500 hover:text-gray-300 flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z"/>
-              </svg>
-              Replay {tierIndex === 3 ? 'full preview' : `${CLIP_DURATIONS[tierIndex]}s clip`}
-            </button>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => playCurrentClip(tierIndex)}
+                disabled={isPlaying || !currentPreviewUrl}
+                className="text-sm text-gray-500 hover:text-gray-300 flex items-center gap-1.5 transition-colors disabled:opacity-40"
+              >
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+                Replay {tierIndex === 3 ? 'full' : `${CLIP_DURATIONS[tierIndex]}s`}
+              </button>
+
+              <button
+                onClick={handleSkip}
+                className="text-sm text-gray-600 hover:text-red-400 transition-colors"
+              >
+                Give up
+              </button>
+            </div>
           </div>
         )}
 
