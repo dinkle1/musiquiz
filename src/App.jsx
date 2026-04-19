@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { exchangeCodeForToken, getStoredToken, clearToken } from './utils/spotify.js'
 import { stopCurrentAudio, clearAudioCache } from './utils/audio.js'
 import { clearPreviewCache } from './utils/itunes.js'
@@ -45,7 +45,7 @@ export default function App() {
     }
   }, [])
 
-  function handleLogout() {
+  const handleLogout = useCallback(() => {
     clearToken()
     clearAudioCache()
     clearPreviewCache()
@@ -54,36 +54,35 @@ export default function App() {
     setScreen('login')
     setSelectedPlaylist(null)
     setQuizResult(null)
-  }
+  }, [])
 
-  function handlePlaylistSelect(playlist) {
+  const handlePlaylistSelect = useCallback((playlist) => {
     setSelectedPlaylist(playlist)
     setScreen('quiz')
-  }
+  }, [])
 
-  function handleQuizFinish(result) {
+  const handleQuizFinish = useCallback((result) => {
     if (!result) {
-      // Error — go back to playlists
       setScreen('playlists')
       return
     }
     stopCurrentAudio()
     setQuizResult(result)
     setScreen('results')
-  }
+  }, [])
 
-  function handleRestart() {
+  const handleRestart = useCallback(() => {
     clearAudioCache()
     clearPreviewCache()
     setScreen('quiz')
-  }
+  }, [])
 
-  function handlePickNew() {
+  const handlePickNew = useCallback(() => {
     clearAudioCache()
     clearPreviewCache()
     setSelectedPlaylist(null)
     setScreen('playlists')
-  }
+  }, [])
 
   if (authError) {
     return (

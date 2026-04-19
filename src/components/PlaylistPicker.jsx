@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { fetchPlaylists, clearToken } from '../utils/spotify.js'
 
 export default function PlaylistPicker({ token, onSelect, onLogout }) {
@@ -6,16 +6,23 @@ export default function PlaylistPicker({ token, onSelect, onLogout }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
+  const onLogoutRef = useRef(onLogout)
+  onLogoutRef.current = onLogout
 
   useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
     fetchPlaylists(token)
-      .then(setPlaylists)
+      .then((data) => { if (!cancelled) setPlaylists(data) })
       .catch((err) => {
-        if (err.message === 'UNAUTHORIZED') onLogout()
+        if (cancelled) return
+        if (err.message === 'UNAUTHORIZED') onLogoutRef.current()
         else setError('Failed to load playlists. Please try again.')
       })
-      .finally(() => setLoading(false))
-  }, [token, onLogout])
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [token])
 
   const filtered = playlists.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
