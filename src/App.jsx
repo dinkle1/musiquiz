@@ -6,12 +6,19 @@ import Login from './components/Login.jsx'
 import PlaylistPicker from './components/PlaylistPicker.jsx'
 import Quiz from './components/Quiz.jsx'
 import Results from './components/Results.jsx'
+import Leaderboard from './components/Leaderboard.jsx'
+import Lobby from './components/Lobby.jsx'
+import OneVOne from './components/OneVOne.jsx'
 
 export default function App() {
   const [token, setToken] = useState(null)
-  const [screen, setScreen] = useState('login') // login | playlists | quiz | results
+  const [screen, setScreen] = useState('login') // login | playlists | quiz | results | leaderboard | lobby | onevone
   const [selectedPlaylist, setSelectedPlaylist] = useState(null)
+  const [gameMode, setGameMode] = useState('song')
+  const [activeMods, setActiveMods] = useState(new Set())
   const [quizResult, setQuizResult] = useState(null)
+  const [leaderboardData, setLeaderboardData] = useState(null) // { score, totalSongs }
+  const [lobbyInfo, setLobbyInfo] = useState(null) // { code, role, playerId, playerName }
   const [authError, setAuthError] = useState(null)
 
   // Handle OAuth callback
@@ -37,7 +44,6 @@ export default function App() {
       return
     }
 
-    // Check stored token
     const stored = getStoredToken()
     if (stored) {
       setToken(stored)
@@ -54,11 +60,24 @@ export default function App() {
     setScreen('login')
     setSelectedPlaylist(null)
     setQuizResult(null)
+    setLobbyInfo(null)
+    setLeaderboardData(null)
   }, [])
 
-  const handlePlaylistSelect = useCallback((playlist) => {
+  const handlePlaylistSelect = useCallback(({ playlist, gameMode: mode, activeMods: mods }) => {
     setSelectedPlaylist(playlist)
+    setGameMode(mode)
+    setActiveMods(mods)
     setScreen('quiz')
+  }, [])
+
+  const handleBattle = useCallback(() => {
+    setScreen('lobby')
+  }, [])
+
+  const handleLobbyReady = useCallback((info) => {
+    setLobbyInfo(info)
+    setScreen('onevone')
   }, [])
 
   const handleQuizFinish = useCallback((result) => {
@@ -69,6 +88,11 @@ export default function App() {
     stopCurrentAudio()
     setQuizResult(result)
     setScreen('results')
+  }, [])
+
+  const handleLeaderboard = useCallback((score, totalSongs) => {
+    setLeaderboardData({ score, totalSongs })
+    setScreen('leaderboard')
   }, [])
 
   const handleRestart = useCallback(() => {
@@ -105,6 +129,7 @@ export default function App() {
       <PlaylistPicker
         token={token}
         onSelect={handlePlaylistSelect}
+        onBattle={handleBattle}
         onLogout={handleLogout}
       />
     )
@@ -115,6 +140,8 @@ export default function App() {
       <Quiz
         token={token}
         playlist={selectedPlaylist}
+        gameMode={gameMode}
+        activeMods={activeMods}
         onFinish={handleQuizFinish}
         onLogout={handleLogout}
       />
@@ -127,8 +154,43 @@ export default function App() {
         songList={quizResult.songList}
         results={quizResult.results}
         playlist={quizResult.playlist}
+        gameMode={gameMode}
+        activeMods={activeMods}
         onRestart={handleRestart}
         onPickNew={handlePickNew}
+        onLeaderboard={handleLeaderboard}
+      />
+    )
+  }
+
+  if (screen === 'leaderboard') {
+    return (
+      <Leaderboard
+        pendingScore={leaderboardData?.score ?? null}
+        totalSongs={leaderboardData?.totalSongs ?? 0}
+        onBack={() => setScreen('playlists')}
+      />
+    )
+  }
+
+  if (screen === 'lobby') {
+    return (
+      <Lobby
+        token={token}
+        onLobbyReady={handleLobbyReady}
+        onBack={() => setScreen('playlists')}
+      />
+    )
+  }
+
+  if (screen === 'onevone' && lobbyInfo) {
+    return (
+      <OneVOne
+        code={lobbyInfo.code}
+        role={lobbyInfo.role}
+        playerId={lobbyInfo.playerId}
+        playerName={lobbyInfo.playerName}
+        onBack={() => setScreen('playlists')}
       />
     )
   }
