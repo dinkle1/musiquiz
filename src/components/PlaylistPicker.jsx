@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { fetchPlaylists, clearToken } from '../utils/spotify.js'
+import { getDailyChartMeta } from '../utils/charts.js'
 import ModSelector from './ModSelector.jsx'
 
 const MODES = [
@@ -9,13 +10,7 @@ const MODES = [
   { id: 'onevone', label: '1v1 Battle',        icon: '⚔', desc: 'Challenge a friend' },
 ]
 
-const DAILY_PLAYLIST_ID = '37i9dQZEVXbMDoHDwVN2tF'
-const DAILY_PLAYLIST_MOCK = {
-  id: DAILY_PLAYLIST_ID,
-  name: 'Top 50 – Global',
-  images: [{ url: 'https://charts-images.scdn.co/assets/locale_en/regional/daily/region_global_default_image.jpg' }],
-  tracks: { total: 50 },
-}
+const DAILY_PLAYLIST_MOCK = getDailyChartMeta()
 
 export default function PlaylistPicker({ token, onSelect, onBattle, onLogout }) {
   const [playlists, setPlaylists] = useState([])
@@ -52,6 +47,13 @@ export default function PlaylistPicker({ token, onSelect, onBattle, onLogout }) 
     if (gameMode === 'onevone') return
     setPendingPlaylist(playlist)
     setShowMods(true)
+  }
+
+  function switchMode(id) {
+    if (id === gameMode) return
+    setGameMode(id)
+    setPendingPlaylist(null)
+    setShowMods(false)
   }
 
   function handleModConfirm() {
@@ -121,8 +123,8 @@ export default function PlaylistPicker({ token, onSelect, onBattle, onLogout }) 
             {MODES.map((m) => (
               <button
                 key={m.id}
-                onClick={() => setGameMode(m.id)}
-                className="relative py-3 px-2 rounded-xl text-center transition-all duration-200 cursor-pointer"
+                onClick={() => switchMode(m.id)}
+                className="relative py-3 px-2 rounded-xl text-center transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--neon)]"
                 style={{
                   background: gameMode === m.id ? 'var(--bg-3)' : 'transparent',
                   boxShadow: gameMode === m.id ? '0 0 20px rgba(0,255,135,0.15)' : 'none',
@@ -152,12 +154,30 @@ export default function PlaylistPicker({ token, onSelect, onBattle, onLogout }) 
             <BattleModePanel onBattle={onBattle} />
           ) : (
             <>
+              <div
+                className="rounded-xl px-4 py-3 flex items-center gap-3"
+                style={{
+                  background: gameMode === 'album' ? 'rgba(168,85,247,0.08)' : 'rgba(0,255,135,0.06)',
+                  border: `1px solid ${gameMode === 'album' ? 'rgba(168,85,247,0.3)' : 'rgba(0,255,135,0.25)'}`,
+                }}
+              >
+                <span className="text-xl">{gameMode === 'album' ? '💿' : '🎵'}</span>
+                <div className="min-w-0">
+                  <p className="text-white text-sm font-semibold" style={{ fontFamily: 'Righteous' }}>
+                    {gameMode === 'album' ? 'Album Quiz' : 'Song Quiz'}
+                  </p>
+                  <p className="text-xs" style={{ color: gameMode === 'album' ? 'var(--purple)' : 'var(--neon)' }}>
+                    {gameMode === 'album' ? 'Guess the album from a clip' : 'Guess the song from a clip'}
+                  </p>
+                </div>
+              </div>
+
               <input
                 type="text"
-                placeholder="Search playlists…"
+                placeholder={gameMode === 'album' ? 'Search playlists for Album Quiz…' : 'Search playlists for Song Quiz…'}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all"
+                className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus-visible:ring-2 focus-visible:ring-[var(--neon)]"
                 style={{
                   background: 'var(--bg-2)',
                   border: '1px solid rgba(255,255,255,0.08)',
@@ -281,11 +301,11 @@ function DailyModePanel({ onSelect }) {
           <span className="text-4xl">🏆</span>
           <div>
             <h3 className="text-xl text-white" style={{ fontFamily: 'Righteous' }}>Daily Challenge</h3>
-            <p className="text-[var(--muted)] text-sm">Spotify Top 50 – Global · Resets at midnight EST</p>
+            <p className="text-[var(--muted)] text-sm">Apple Music Top 50 · Resets at midnight EST</p>
           </div>
         </div>
         <p className="text-[var(--muted)] text-sm">
-          Guess songs from today's global top 50. You get one attempt per day.
+          Guess 20 songs from today's Apple Music Top 50. One attempt per day.
           Your score is posted to the global leaderboard.
         </p>
         <button

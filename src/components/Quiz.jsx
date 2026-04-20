@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { fetchPlaylistTracks } from '../utils/spotify.js'
 import { fetchPreviewUrl } from '../utils/itunes.js'
+import { fetchDailyChart } from '../utils/charts.js'
 import { playClip, stopCurrentAudio, getRandomOffset, preloadAudio, setVolume, getVolume } from '../utils/audio.js'
 import { getModConfig, MODS } from '../utils/mods.js'
 import Autocomplete from './Autocomplete.jsx'
+
+const DAILY_SONG_COUNT = 20
 
 const BASE_CLIP_DURATIONS = [1, 3, 5, 30]
 const TIER_LABELS = ['1s', '3s', '5s', 'Full']
@@ -103,18 +106,26 @@ export default function Quiz({ token, playlist, gameMode, activeMods, onFinish, 
   const resultsRef = useRef([])
 
   useEffect(() => {
-    fetchPlaylistTracks(token, playlist.id)
+    const loader = gameMode === 'daily'
+      ? fetchDailyChart()
+      : fetchPlaylistTracks(token, playlist.id)
+
+    loader
       .then((tracks) => {
         if (tracks.length === 0) { setLoadingError('This playlist is empty.'); return }
-        const shuffled = shuffle(tracks)
-        const list = shuffled.map(t => ({
-          id: t.id,
-          title: t.name,
-          artist: t.artists.map(a => a.name).join(', '),
-          albumArt: t.album.images?.[1]?.url || t.album.images?.[0]?.url,
-          albumName: t.album.name,
-        }))
-        shuffled.forEach(t => { offsetRef.current[t.id] = getRandomOffset() })
+        let shuffled = shuffle(tracks)
+        if (gameMode === 'daily') shuffled = shuffled.slice(0, DAILY_SONG_COUNT)
+
+        const list = shuffled
+          .filter(t => t.id && t.name && t.album)
+          .map(t => ({
+            id: t.id,
+            title: t.name,
+            artist: t.artists?.map(a => a.name).join(', ') || '',
+            albumArt: t.album.images?.[1]?.url || t.album.images?.[0]?.url || '',
+            albumName: t.album.name || '',
+          }))
+        list.forEach(s => { offsetRef.current[s.id] = getRandomOffset() })
 
         const uniqueAlbums = [...new Map(
           list.map(s => [s.albumName, { id: s.albumName, title: s.albumName, artist: '', albumArt: s.albumArt }])
@@ -131,7 +142,7 @@ export default function Quiz({ token, playlist, gameMode, activeMods, onFinish, 
         else setLoadingError('Failed to load tracks.')
       })
       .finally(() => setLoading(false))
-  }, [token, playlist.id, onLogout])
+  }, [token, playlist.id, gameMode, onLogout])
 
   // When song changes, fetch preview and auto-play
   useEffect(() => {
@@ -402,8 +413,14 @@ export default function Quiz({ token, playlist, gameMode, activeMods, onFinish, 
                 {activeModsList.map(id => (
                   <span
                     key={id}
-                    className="text-xs px-1.5 py-0.5 rounded font-bold"
-                    style={{ background: `${MODS[id].color}22`, color: MODS[id].color, fontFamily: 'Righteous' }}
+                    className="mod-badge text-xs px-1.5 py-0.5 rounded font-bold"
+                    style={{
+                      background: `${MODS[id].color}22`,
+                      border: `1px solid ${MODS[id].color}55`,
+                      color: MODS[id].color,
+                      fontFamily: 'Righteous',
+                    }}
+                    title={`${MODS[id].name} — ${MODS[id].desc}`}
                   >
                     {id}
                   </span>
@@ -599,7 +616,7 @@ export default function Quiz({ token, playlist, gameMode, activeMods, onFinish, 
               <button
                 onClick={handleSubmit}
                 disabled={!selectedSong}
-                className="flex-1 py-3 rounded-xl font-bold text-black cursor-pointer transition-all duration-200 disabled:cursor-not-allowed"
+                className="btn-press flex-1 py-3 rounded-xl font-bold text-black cursor-pointer disabled:cursor-not-allowed"
                 style={{
                   background: selectedSong ? 'var(--neon)' : 'var(--bg-3)',
                   color: selectedSong ? 'black' : 'var(--muted)',
@@ -614,7 +631,7 @@ export default function Quiz({ token, playlist, gameMode, activeMods, onFinish, 
                 <button
                   onClick={handleExtend}
                   disabled={isPlaying}
-                  className="px-4 py-3 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-200 disabled:opacity-50"
+                  className="btn-press px-4 py-3 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50"
                   style={{
                     background: 'var(--bg-2)',
                     border: '1px solid rgba(255,255,255,0.1)',

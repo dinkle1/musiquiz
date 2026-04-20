@@ -226,4 +226,44 @@ input[type=range]::-moz-range-thumb {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  body::before { display: none; }
+}
+
+/* ── Focus rings (a11y) ───────────────────────────── */
+button:focus { outline: none; }
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--neon);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--neon);
+  outline-offset: 1px;
+}
+
+/* ── Button press feedback ────────────────────────── */
+.btn-press { transition: transform 120ms ease, box-shadow 200ms ease, background-color 200ms ease; }
+.btn-press:active:not(:disabled) { transform: translateY(1px) scale(0.99); }
+
+/* ── Mod badge shimmer ────────────────────────────── */
+@keyframes mod-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.mod-badge {
+  position: relative;
+  overflow: hidden;
+}
+.mod-badge::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: mod-shimmer 3s linear infinite;
+  pointer-events: none;
 }

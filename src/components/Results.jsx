@@ -86,8 +86,9 @@ export default function Results({ songList, results, playlist, gameMode, activeM
           {activeModsList.length > 0 && (
             <div className="flex justify-center gap-2 flex-wrap">
               {activeModsList.map(id => (
-                <span key={id} className="px-2 py-1 rounded-lg text-xs font-bold"
-                  style={{ background: `${MODS[id].color}22`, border: `1px solid ${MODS[id].color}55`, color: MODS[id].color, fontFamily: 'Righteous' }}>
+                <span key={id} className="mod-badge px-2 py-1 rounded-lg text-xs font-bold"
+                  style={{ background: `${MODS[id].color}22`, border: `1px solid ${MODS[id].color}55`, color: MODS[id].color, fontFamily: 'Righteous' }}
+                  title={`${MODS[id].name} — ${MODS[id].desc}`}>
                   {MODS[id].icon} {id}
                 </span>
               ))}
@@ -168,7 +169,7 @@ export default function Results({ songList, results, playlist, gameMode, activeM
         <button
           onClick={handleCopyImage}
           disabled={copying}
-          className="w-full py-3 rounded-xl font-bold cursor-pointer transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50"
+          className="btn-press w-full py-3 rounded-xl font-bold cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
           style={{ background: 'var(--neon)', color: 'black', fontFamily: 'Righteous' }}
           onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 30px rgba(0,255,135,0.5)'}
           onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
@@ -205,7 +206,7 @@ export default function Results({ songList, results, playlist, gameMode, activeM
         {/* Actions */}
         <div className="flex gap-3 pb-8">
           <button onClick={onRestart}
-            className="flex-1 py-3 rounded-xl font-semibold cursor-pointer transition-all"
+            className="btn-press flex-1 py-3 rounded-xl font-semibold cursor-pointer transition-colors duration-200"
             style={{ background: 'var(--bg-2)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text)' }}
             onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--neon)'}
             onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
@@ -213,7 +214,7 @@ export default function Results({ songList, results, playlist, gameMode, activeM
             Redo playlist
           </button>
           <button onClick={onPickNew}
-            className="flex-1 py-3 rounded-xl font-semibold cursor-pointer transition-all"
+            className="btn-press flex-1 py-3 rounded-xl font-semibold cursor-pointer transition-colors duration-200"
             style={{ background: 'var(--bg-2)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text)' }}
             onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--neon)'}
             onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}

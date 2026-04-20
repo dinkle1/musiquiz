@@ -62,6 +62,8 @@ export default function App() {
     setQuizResult(null)
     setLobbyInfo(null)
     setLeaderboardData(null)
+    setGameMode('song')
+    setActiveMods(new Set())
   }, [])
 
   const handlePlaylistSelect = useCallback(({ playlist, gameMode: mode, activeMods: mods }) => {
@@ -109,6 +111,8 @@ export default function App() {
     clearAudioCache()
     clearPreviewCache()
     setSelectedPlaylist(null)
+    setGameMode('song')
+    setActiveMods(new Set())
     setScreen('playlists')
   }, [])
 
@@ -142,6 +146,7 @@ export default function App() {
   if (screen === 'quiz' && selectedPlaylist) {
     return (
       <Quiz
+        key={`${selectedPlaylist.id}-${gameMode}`}
         token={token}
         playlist={selectedPlaylist}
         gameMode={gameMode}
