@@ -18,12 +18,13 @@ export default function Autocomplete({ songs, onSelect, disabled, placeholder = 
     })
   }, [songs])
 
+  // Reset query only on mount (when key changes externally to signal a new round)
   useEffect(() => {
     setQuery('')
     setResults([])
     setOpen(false)
     setTimeout(() => inputRef.current?.focus(), 80)
-  }, [songs])
+  }, [])
 
   function handleChange(e) {
     const val = e.target.value

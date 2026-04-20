@@ -343,6 +343,7 @@ export default function OneVOne({ code, role, playerId, playerName, onBack }) {
         {clipStarted && !roundOver && lobby.startAt && (
           <div className="w-full max-w-md space-y-3 slide-up">
             <Autocomplete
+              key={lobby.currentSong}
               songs={lobby.songList || []}
               onSelect={setSelectedSong}
               disabled={!!guessResult && guessResult !== 'wrong-guess'}

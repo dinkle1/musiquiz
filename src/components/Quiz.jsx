@@ -588,6 +588,7 @@ export default function Quiz({ token, playlist, gameMode, activeMods, onFinish, 
             </div>
 
             <Autocomplete
+              key={currentIndex}
               songs={searchList}
               onSelect={setSelectedSong}
               disabled={previewFetching}
