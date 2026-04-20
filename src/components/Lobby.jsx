@@ -3,8 +3,8 @@ import { fetchPlaylistTracks, fetchPlaylists } from '../utils/spotify.js'
 import { fetchPreviewUrl } from '../utils/itunes.js'
 import { createLobby, joinLobby, getPlayerId, getPlayerName, setPlayerName } from '../utils/lobby.js'
 
-export default function Lobby({ token, onLobbyReady, onBack }) {
-  const [tab, setTab] = useState('create') // 'create' | 'join'
+export default function Lobby({ token, joinOnly = false, onLobbyReady, onBack }) {
+  const [tab, setTab] = useState(joinOnly ? 'join' : 'create') // 'create' | 'join'
   const [name, setName] = useState(getPlayerName())
   const [joinCode, setJoinCode] = useState('')
   const [playlists, setPlaylists] = useState([])
@@ -14,8 +14,9 @@ export default function Lobby({ token, onLobbyReady, onBack }) {
   const [loadingMsg, setLoadingMsg] = useState('')
 
   useEffect(() => {
+    if (joinOnly || !token) return
     fetchPlaylists(token).then(setPlaylists).catch(() => {})
-  }, [token])
+  }, [token, joinOnly])
 
   async function handleCreate() {
     if (!name.trim() || !selectedPlaylist) return
@@ -113,20 +114,22 @@ export default function Lobby({ token, onLobbyReady, onBack }) {
         </div>
 
         {/* Tabs */}
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl" style={{ background: 'var(--bg-2)' }}>
-          {['create', 'join'].map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className="py-2.5 rounded-xl text-sm font-bold cursor-pointer transition-all"
-              style={{
-                fontFamily: 'Righteous',
-                background: tab === t ? 'var(--bg-3)' : 'transparent',
-                color: tab === t ? 'var(--pink)' : 'var(--muted)',
-                boxShadow: tab === t ? '0 0 16px rgba(244,114,182,0.15)' : 'none',
-              }}>
-              {t === 'create' ? '⚡ Create Lobby' : '🔗 Join Lobby'}
-            </button>
-          ))}
-        </div>
+        {!joinOnly && (
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl" style={{ background: 'var(--bg-2)' }}>
+            {['create', 'join'].map(t => (
+              <button key={t} onClick={() => setTab(t)}
+                className="py-2.5 rounded-xl text-sm font-bold cursor-pointer transition-all"
+                style={{
+                  fontFamily: 'Righteous',
+                  background: tab === t ? 'var(--bg-3)' : 'transparent',
+                  color: tab === t ? 'var(--pink)' : 'var(--muted)',
+                  boxShadow: tab === t ? '0 0 16px rgba(244,114,182,0.15)' : 'none',
+                }}>
+                {t === 'create' ? '⚡ Create Lobby' : '🔗 Join Lobby'}
+              </button>
+            ))}
+          </div>
+        )}
 
         {error && (
           <div className="rounded-xl p-3 text-sm text-red-400"

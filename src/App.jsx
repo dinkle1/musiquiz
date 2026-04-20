@@ -75,6 +75,10 @@ export default function App() {
     setScreen('lobby')
   }, [])
 
+  const handleJoinBattle = useCallback(() => {
+    setScreen('lobby-join')
+  }, [])
+
   const handleLobbyReady = useCallback((info) => {
     setLobbyInfo(info)
     setScreen('onevone')
@@ -122,7 +126,7 @@ export default function App() {
     )
   }
 
-  if (screen === 'login') return <Login />
+  if (screen === 'login') return <Login onJoinBattle={handleJoinBattle} />
 
   if (screen === 'playlists') {
     return (
@@ -179,6 +183,17 @@ export default function App() {
         token={token}
         onLobbyReady={handleLobbyReady}
         onBack={() => setScreen('playlists')}
+      />
+    )
+  }
+
+  if (screen === 'lobby-join') {
+    return (
+      <Lobby
+        token={null}
+        joinOnly
+        onLobbyReady={handleLobbyReady}
+        onBack={() => setScreen('login')}
       />
     )
   }

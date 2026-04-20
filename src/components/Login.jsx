@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { startAuthFlow } from '../utils/spotify.js'
 
-export default function Login() {
+export default function Login({ onJoinBattle }) {
   const clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID
   const [glitchActive, setGlitchActive] = useState(false)
 
@@ -92,6 +92,24 @@ export default function Login() {
         <p className="text-center text-xs text-[var(--muted)]">
           Read-only access · No modifications to your library
         </p>
+
+        <div className="text-center">
+          <div className="text-[var(--muted)] text-xs mb-2">No Spotify? Got an invite code?</div>
+          <button
+            onClick={onJoinBattle}
+            className="px-5 py-2.5 rounded-xl text-sm font-bold cursor-pointer transition-all"
+            style={{
+              background: 'rgba(244,114,182,0.1)',
+              border: '1px solid rgba(244,114,182,0.4)',
+              color: 'var(--pink)',
+              fontFamily: 'Righteous',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(244,114,182,0.2)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(244,114,182,0.1)' }}
+          >
+            ⚔ Join a 1v1 Battle →
+          </button>
+        </div>
       </div>
     </div>
   )
