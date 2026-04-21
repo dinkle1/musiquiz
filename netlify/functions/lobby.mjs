@@ -99,7 +99,7 @@ export default async (req) => {
     // ── GUESS ─────────────────────────────────────
     if (action === 'guess') {
       // Only accept first correct guess per round
-      if (lobby.roundWinner) return Response.json(lobby, { headers: CORS })
+      if (lobby.roundWinner) return Response.json({ correct: false, lobby }, { headers: CORS })
       const currentSong = lobby.songList[lobby.currentSong]
       if (!currentSong) return Response.json(lobby, { headers: CORS })
 
